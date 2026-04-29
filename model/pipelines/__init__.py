@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from model.config import RunConfig
 from model.pipelines.minim import CardiacMINIMPipeline
 
-
-__all__ = ["CardiacMINIMPipeline", "RunConfig"]
+__all__ = ["CardiacMINIMPipeline"]

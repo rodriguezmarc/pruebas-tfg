@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from model.pipeline import run_pipeline
+from model.workflows.full import run_pipeline
 
 
 def main() -> None:

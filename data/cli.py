@@ -1,19 +1,14 @@
 from __future__ import annotations
 
-from data.config import DATASET_PATHS, OUTPUT_PATHS
-from data.run_pipeline import run_csv_pipeline
+from data.config import _build_output_csv_path, OUTPUT_PATHS
+from data.datasets.acdc.cache import export_preprocessed_dataset
 
 
 def main() -> None:
-    rows = run_csv_pipeline(
-        data_path=DATASET_PATHS["acdc"],
-        images_root=OUTPUT_PATHS["images"],
-        csv_root=OUTPUT_PATHS["csv"],
-        internal_root=OUTPUT_PATHS["internal"],
-        dataset="acdc",
-        modality="Cardiac MRI",
-    )
+    rows = export_preprocessed_dataset(split="train")
+    output_csv_path = _build_output_csv_path(OUTPUT_PATHS["csv"])
     print(f"Exported {len(rows)} ACDC rows.")
+    print(f"CSV created at {output_csv_path}.")
 
 
 if __name__ == "__main__":

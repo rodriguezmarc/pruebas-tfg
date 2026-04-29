@@ -6,12 +6,7 @@ Shared dataset input and output path configuration.
 
 from pathlib import Path
 
-DATASET_PATHS = {
-    "acdc": Path("HF_CACHE"),
-    "ukbb": Path("UKBB"),
-}
-
-CACHE_BACKED_DATASETS = frozenset({"acdc"})
+ACDC_DATASET_PATH = Path("HF_CACHE")
 
 OUTPUT_PATHS = {
     "images": Path("outputs/data/images"),
@@ -19,7 +14,7 @@ OUTPUT_PATHS = {
     "internal": Path("outputs/data/internal"),
 }
 
-def _build_output_csv_path(csv_root: Path, dataset: str) -> Path:
+def _build_output_csv_path(csv_root: Path, dataset: str = "acdc") -> Path:
     """
     ########################################
     Definition:
@@ -36,7 +31,7 @@ def _build_output_csv_path(csv_root: Path, dataset: str) -> Path:
     return csv_root / f"{dataset}_minim.csv"
 
 
-def _build_internal_csv_path(internal_root: Path, dataset: str) -> Path:
+def _build_internal_csv_path(internal_root: Path, dataset: str = "acdc") -> Path:
     """
     ########################################
     Definition:

@@ -16,12 +16,12 @@ LABEL_TO_NAME = {
     LV_LABEL: "LV",
 }
 
-from data.run_pipeline import run_csv_pipeline
+from data.datasets.acdc.cache import export_preprocessed_dataset
 
 __all__ = [
     "RV_LABEL",
     "MYO_LABEL",
     "LV_LABEL",
     "LABEL_TO_NAME",
-    "run_csv_pipeline",
+    "export_preprocessed_dataset",
 ]

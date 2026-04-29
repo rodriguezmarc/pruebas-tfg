@@ -5,14 +5,18 @@ from pathlib import Path
 
 import torch
 from diffusers import AutoencoderKL, DDPMScheduler, StableDiffusionPipeline, UNet2DConditionModel
+from diffusers.utils import convert_state_dict_to_diffusers
 from peft import LoraConfig
+from peft import get_peft_model_state_dict
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
 from model.config import RunConfig
-from model.dataset import PromptImageDataset, PromptImageRow, build_minim_prompt, collate_prompt_image_batch
+from model.datasets.prompt_image import PromptImageDataset, PromptImageRow, build_minim_prompt, collate_prompt_image_batch
+from model.pipelines.minim import CardiacMINIMPipeline
+from model.runtime.device import select_device_and_dtype
 
 DEFAULT_LORA_TARGET_MODULES = ("to_q", "to_k", "to_v", "to_out.0")
 
@@ -28,45 +32,45 @@ class TrainingArtifacts:
     dtype: torch.dtype
 
 
-def _select_device() -> tuple[torch.device, torch.dtype]:
-    if torch.cuda.is_available():
-        return torch.device("cuda"), torch.float16
-    return torch.device("cpu"), torch.float32
-
-
 def _load_training_artifacts(config: RunConfig) -> TrainingArtifacts:
-    device, dtype = _select_device()
+    device, dtype = select_device_and_dtype(config)
 
-    # Tokenizer / text encoder / VAE are loaded from the base MINIM repository.
+    # Tokenizer / text encoder / VAE are loaded from the Stable Diffusion base
+    # checkpoint that MINIM was trained from.
     tokenizer = CLIPTokenizer.from_pretrained(
         config.base_model_id,
         subfolder="tokenizer",
-        local_files_only=True,
+        local_files_only=config.local_files_only,
+        cache_dir=config.cache_dir,
     )
     text_encoder = CLIPTextModel.from_pretrained(
         config.base_model_id,
         subfolder="text_encoder",
-        local_files_only=True,
+        local_files_only=config.local_files_only,
+        cache_dir=config.cache_dir,
         torch_dtype=dtype,
     )
     vae = AutoencoderKL.from_pretrained(
         config.base_model_id,
         subfolder="vae",
-        local_files_only=True,
+        local_files_only=config.local_files_only,
+        cache_dir=config.cache_dir,
         torch_dtype=dtype,
     )
 
     # MINIM routes medical modalities through dedicated UNet branches.
     unet = UNet2DConditionModel.from_pretrained(
-        config.base_model_id,
+        config.minim_repo_id,
         subfolder=config.minim_unet_subfolder,
-        local_files_only=True,
+        local_files_only=config.local_files_only,
+        cache_dir=config.cache_dir,
         torch_dtype=dtype,
     )
     noise_scheduler = DDPMScheduler.from_pretrained(
         config.base_model_id,
         subfolder="scheduler",
-        local_files_only=True,
+        local_files_only=config.local_files_only,
+        cache_dir=config.cache_dir,
     )
 
     text_encoder.requires_grad_(False)
@@ -118,7 +122,16 @@ def _encode_prompts(
 
 def _save_adapter(unet: UNet2DConditionModel, adapter_dir: Path) -> None:
     adapter_dir.mkdir(parents=True, exist_ok=True)
-    unet.save_pretrained(adapter_dir)
+    # Persist only the LoRA delta weights instead of the full UNet checkpoint.
+    # This keeps adapter exports small and avoids multi-GB writes to disk.
+    lora_state_dict = get_peft_model_state_dict(unet)
+    diffusers_lora_state_dict = convert_state_dict_to_diffusers(lora_state_dict)
+    StableDiffusionPipeline.save_lora_weights(
+        save_directory=adapter_dir,
+        unet_lora_layers=diffusers_lora_state_dict,
+        is_main_process=True,
+        safe_serialization=True,
+    )
 
 
 def finetune_lora(
@@ -196,19 +209,41 @@ def finetune_lora(
 def build_inference_pipeline(
     config: RunConfig,
     artifacts: TrainingArtifacts,
-) -> StableDiffusionPipeline:
+) -> CardiacMINIMPipeline:
     # Rebuild the full Stable Diffusion pipeline while keeping the MRI-family UNet
     # branch already adapted with LoRA.
-    pipe = StableDiffusionPipeline.from_pretrained(
-        config.base_model_id,
-        local_files_only=True,
-        torch_dtype=artifacts.dtype,
-        tokenizer=artifacts.tokenizer,
-        text_encoder=artifacts.text_encoder,
-        vae=artifacts.vae,
+    pipe = CardiacMINIMPipeline.from_cardiac_minim(
+        config,
         unet=artifacts.unet,
-        safety_checker=None,
+        torch_dtype=artifacts.dtype,
+        local_files_only=config.local_files_only,
     )
+    pipe.tokenizer = artifacts.tokenizer
+    pipe.text_encoder = artifacts.text_encoder
+    pipe.vae = artifacts.vae
     pipe = pipe.to(artifacts.device)
     pipe.enable_attention_slicing()
+    if config.enable_xformers and artifacts.device.type == "cuda":
+        try:
+            pipe.enable_xformers_memory_efficient_attention()
+        except Exception:
+            pass
+    return pipe
+
+
+def build_inference_pipeline_from_adapter(config: RunConfig) -> CardiacMINIMPipeline:
+    device, dtype = select_device_and_dtype(config)
+    pipe = CardiacMINIMPipeline.from_cardiac_minim(
+        config,
+        torch_dtype=dtype,
+        local_files_only=config.local_files_only,
+    )
+    pipe.load_lora_weights(config.adapter_dir)
+    pipe = pipe.to(device)
+    pipe.enable_attention_slicing()
+    if config.enable_xformers and device.type == "cuda":
+        try:
+            pipe.enable_xformers_memory_efficient_attention()
+        except Exception:
+            pass
     return pipe
