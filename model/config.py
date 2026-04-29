@@ -23,14 +23,14 @@ class RunConfig:
 
     train_split: str = "train"                                  # reference to dataset train split
     train_batch_size: int = 1                                   # training batch size
-    num_train_epochs: int = 10                                  # training epochs
-    max_train_steps: int = 50                                   # training steps maximum
+    num_train_epochs: int = 100                                 # training epochs
+    max_train_steps: int = 2000                                 # training steps maximum
     learning_rate: float = 5e-5                                 # training learning rate
     gradient_accumulation_steps: int = 1                        # training gradient accumulation steps
 
     batch_size: int = 1                                         # inference batch size
     num_inference_steps: int = 50                               # inference steps
-    guidance_scale: float = 7.5                                 # guidance scale
+    guidance_scale: float = 1.0                                 # guidance scale
     resolution: int = 512                                       # resolution
     inference_row_index: int = 0                                # selected prompt-image row used for single-image inference
     negative_prompt: str = "blurry, distorted, artifact"        # negative prompt aligned with MINIM examples
@@ -38,7 +38,7 @@ class RunConfig:
     adapter_dirname: str = "lora_adapter"                       # LoRA adapter directory
     lora_rank: int = 16                                         # fine-tuning LoRA rank
     lora_alpha: int = 16                                        # fine-tuning LoRA alpha
-    lora_dropout: float = 0.1                                   # fine-tuning LoRA dropout
+    lora_dropout: float = 0.0                                   # fine-tuning LoRA dropout
 
     @property
     def adapter_dir(self) -> Path:

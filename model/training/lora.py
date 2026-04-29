@@ -34,6 +34,7 @@ class TrainingArtifacts:
 
 def _load_training_artifacts(config: RunConfig) -> TrainingArtifacts:
     device, dtype = select_device_and_dtype(config)
+    dtype=torch.float32
 
     # Tokenizer / text encoder / VAE are loaded from the Stable Diffusion base
     # checkpoint that MINIM was trained from.
@@ -188,7 +189,18 @@ def finetune_lora(
                 encoder_hidden_states=encoder_hidden_states,
             ).sample
             loss = torch.nn.functional.mse_loss(model_pred.float(), noise.float(), reduction="mean")
+            
+            if not torch.isfinite(loss):
+                raise RuntimeError(f"Non-finite loss {loss.item()} at step {global_step}")
             loss.backward()
+
+            torch.nn.utils.clip_grad_norm_(trainable_parameters, max_norm=1.0)
+            bad_gray = any(
+                p.grad is not None and not torch.isfinite(p.grad).all()
+                for p in trainable_parameters
+            )
+            if bad_gray:
+                raise RuntimeError(f"Non-finite gradients at step {global_step}")
 
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)

@@ -10,6 +10,41 @@ from model.datasets.prompt_image import build_minim_prompt
 
 
 class CardiacMINIMPipeline(StableDiffusionPipeline):
+    def __init__(
+            self,
+        vae,
+        text_encoder,
+        tokenizer,
+        unet,
+        scheduler,
+        safety_checker=None,
+        feature_extractor=None,
+        image_encoder=None,
+        requires_safety_checker: bool = False,
+        modality: str = "Cardiac MRI",
+        minim_repo_id: str = "CoheeY/MINIM",
+        minim_modality_id: int = 4,
+        negative_prompt: str = "blurry, distorted, artifact",
+    ):
+        super().__init__(
+            vae=vae,
+            text_encoder=text_encoder,
+            tokenizer=tokenizer,
+            unet=unet,
+            scheduler=scheduler,
+            safety_checker=safety_checker,
+            feature_extractor=feature_extractor,
+            image_encoder=image_encoder,
+            requires_safety_checker=requires_safety_checker,
+        )
+
+        self.register_to_config(
+            modality=modality,
+            minim_repo_id=minim_repo_id,
+            minim_modality_id=minim_modality_id,
+            negative_prompt=negative_prompt,
+        )
+
     @classmethod
     def from_cardiac_minim(
         cls,
@@ -21,6 +56,7 @@ class CardiacMINIMPipeline(StableDiffusionPipeline):
     ) -> "CardiacMINIMPipeline":
         active_dtype = torch.float16 if torch_dtype is None else torch_dtype
         active_unet = unet
+
         if active_unet is None:
             active_unet = UNet2DConditionModel.from_pretrained(
                 config.minim_repo_id,
@@ -38,14 +74,24 @@ class CardiacMINIMPipeline(StableDiffusionPipeline):
             cache_dir=config.cache_dir,
             torch_dtype=active_dtype,
         )
-        pipe = cls(**base_pipe.components)
-        pipe.register_to_config(
+
+        return cls(
+            vae=base_pipe.vae,
+            text_encoder=base_pipe.text_encoder,
+            tokenizer=base_pipe.tokenizer,
+            unet=base_pipe.unet,
+            scheduler=base_pipe.scheduler,
+            safety_checker=None,
+            feature_extractor=base_pipe.feature_extractor,
+            image_encoder=getattr(base_pipe, "image_encoder", None),
+            requires_safety_checker=False,
             modality=config.modality,
             minim_repo_id=config.minim_repo_id,
             minim_modality_id=config.minim_modality_id,
             negative_prompt=config.negative_prompt,
         )
-        return pipe
+
+
 
     def _condition_prompt(self, prompt: str | list[str]) -> str | list[str]:
         modality_id = int(self.config.minim_modality_id)
