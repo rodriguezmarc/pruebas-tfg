@@ -29,8 +29,8 @@ class RunConfig:
     gradient_accumulation_steps: int = 1                        # training gradient accumulation steps
 
     batch_size: int = 1                                         # inference batch size
-    num_inference_steps: int = 50                               # inference steps
-    guidance_scale: float = 1.0                                 # guidance scale
+    num_inference_steps: int = 100                              # inference steps
+    guidance_scale: float = 8.0                                 # guidance scale
     resolution: int = 512                                       # resolution
     inference_row_index: int = 0                                # selected prompt-image row used for single-image inference
     negative_prompt: str = "blurry, distorted, artifact"        # negative prompt aligned with MINIM examples
@@ -59,6 +59,10 @@ class RunConfig:
     @property
     def comparisons_dir(self) -> Path:
         return self.results_root / "comparisons"
+
+    @property
+    def metrics_path(self) -> Path:
+        return self.results_root / "metrics.json"
 
     @property
     def minim_unet_subfolder(self) -> str:

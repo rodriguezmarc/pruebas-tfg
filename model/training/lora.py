@@ -34,7 +34,6 @@ class TrainingArtifacts:
 
 def _load_training_artifacts(config: RunConfig) -> TrainingArtifacts:
     device, dtype = select_device_and_dtype(config)
-    dtype=torch.float32
 
     # Tokenizer / text encoder / VAE are loaded from the Stable Diffusion base
     # checkpoint that MINIM was trained from.

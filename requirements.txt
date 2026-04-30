@@ -11,3 +11,5 @@ peft
 accelerate
 huggingface_hub
 safetensors
+scipy
+pytorch-msssim

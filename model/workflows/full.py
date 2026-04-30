@@ -28,4 +28,4 @@ def run_pipeline(config: RunConfig | None = None) -> int:
 
     # Step 4. Inference results
     print("4/4 Running inference from saved LoRA adapters...")
-    return run_infer_from_row(active_config, inference_row)
+    return run_infer_from_row(active_config, inference_row, rows)
